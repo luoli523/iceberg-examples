@@ -57,20 +57,625 @@
 
 
 # Scan
+
   * TableScan —— 对一次 Table scan API 的配置 
   * BatchScan
   * IncrementalAppendScan
-  * IncrementalChangelogScan 
+  * IncrementalChangelogScan
 
 
-# Schema
+
+
+# 1. TableMetadata
+
+用来表示 Table Metadata的class。通常一份 Table Metadata 包含如下内容：
+
+1. Schema List ：表示 Table 的Schema描述详情和变更版本详情
+2. PartitionSpec List ： 表示 Table 分区的描述详情
+3. SortOrder ：Table 中数据和被删除的文件的排序描述
+4. Location ： Table的数据和元数据存储路径
+5. Properties ： Table 的属性KV对
+6. Snapshot List : Table 的所有 snapshot 的描述详情和变更历史
+
+
+
+一个Iceberg `非分区表` 表目录结构示例：
+```
+li.luo@luolishopeenewmac:/tmp/iceberg/warehouse/db/test$ tree .
+.
+├── data
+│   ├── 00000-0-0ed4e36e-ee39-4888-8643-8f90680b21cd-00001.parquet
+│   ├── 00000-0-6357f26e-b3c7-4036-b115-2d5934b1700e-00001.parquet
+│   ├── 00000-0-9b697d94-adfe-4196-b7fc-c75fc16311f7-00001.parquet
+│   ├── 00000-0-e0ffdded-9395-4af2-ab1f-6154d6e81d4d-00001.parquet
+│   ├── 00000-0-e29ed0b5-ea09-4ad1-9348-66f48bb63ab5-00001.parquet
+│   ├── 00000-0-e2ad9d6e-ee9c-4560-b9af-c822a11efe08-00001.parquet
+│   ├── 00000-0-f57af1f4-010a-4c3a-b489-58f9728151c4-00001.parquet
+│   ├── 00001-1-0ed4e36e-ee39-4888-8643-8f90680b21cd-00001.parquet
+│   ├── 00001-1-6357f26e-b3c7-4036-b115-2d5934b1700e-00001.parquet
+│   ├── 00001-1-9b697d94-adfe-4196-b7fc-c75fc16311f7-00001.parquet
+│   ├── 00001-1-e0ffdded-9395-4af2-ab1f-6154d6e81d4d-00001.parquet
+│   ├── 00001-1-e29ed0b5-ea09-4ad1-9348-66f48bb63ab5-00001.parquet
+│   ├── 00001-1-e2ad9d6e-ee9c-4560-b9af-c822a11efe08-00001.parquet
+│   └── 00001-1-f57af1f4-010a-4c3a-b489-58f9728151c4-00001.parquet             ← 数据文件
+└── metadata
+    ├── 00b96a70-a73e-452b-a3d8-a427c8f18227-m0.avro
+    ├── 12d25526-b4da-4d71-9e37-f350288db001-m0.avro
+    ├── 2ac48652-90e9-4219-9234-27cf38cae740-m0.avro
+    ├── 552eb68c-5ac5-4f38-859e-c9c3dfb080db-m0.avro
+    ├── 8f699dbf-1d9f-4686-b9fc-7ff1514e9dc6-m0.avro
+    ├── a526a897-f0a2-4e59-81c5-1408287e57a6-m0.avro
+    ├── e1957d8e-d901-4f3c-8fde-3c67e8794957-m0.avro                           ← ManifestFile 类
+    ├── snap-1513587217398638675-1-12d25526-b4da-4d71-9e37-f350288db001.avro
+    ├── snap-5412422061727073641-1-552eb68c-5ac5-4f38-859e-c9c3dfb080db.avro
+    ├── snap-5780211464833406240-1-e1957d8e-d901-4f3c-8fde-3c67e8794957.avro
+    ├── snap-6705611632697455614-1-8f699dbf-1d9f-4686-b9fc-7ff1514e9dc6.avro
+    ├── snap-7393123273733423764-1-00b96a70-a73e-452b-a3d8-a427c8f18227.avro
+    ├── snap-7992999869146304788-1-a526a897-f0a2-4e59-81c5-1408287e57a6.avro
+    ├── snap-973334179108984755-1-2ac48652-90e9-4219-9234-27cf38cae740.avro    ← Snapshot 类
+    ├── v1.metadata.json
+    ├── v2.metadata.json
+    ├── v3.metadata.json
+    ├── v4.metadata.json
+    ├── v5.metadata.json
+    ├── v6.metadata.json
+    ├── v7.metadata.json
+    ├── v8.metadata.json
+    └── version-hint.text
+```
+
+一个 Iceberg 分区表目录机构示例：
+
+```
+li.luo@luolishopeenewmac:/tmp/iceberg/warehouse/db/orders$ tree .
+.
+├── data
+│   ├── country=Brazil
+│   │   ├── grass_date=2023-01-01
+│   │   │   └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00001.parquet
+│   │   ├── grass_date=2023-01-02
+│   │   │   └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00002.parquet
+│   │   └── grass_date=2023-01-03
+│   │       └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00003.parquet
+│   ├── country=China
+│   │   ├── grass_date=2023-01-01
+│   │   │   └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00004.parquet
+│   │   ├── grass_date=2023-01-02
+│   │   │   └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00005.parquet
+│   │   └── grass_date=2023-01-03
+│   │       └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00006.parquet
+│   ├── country=Germany
+│   │   ├── grass_date=2023-01-01
+│   │   │   └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00007.parquet
+│   │   ├── grass_date=2023-01-02
+│   │   │   └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00008.parquet
+│   │   └── grass_date=2023-01-03
+│   │       └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00009.parquet
+│   └── country=USA
+│       ├── grass_date=2023-01-01
+│       │   └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00010.parquet
+│       ├── grass_date=2023-01-02
+│       │   └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00011.parquet
+│       └── grass_date=2023-01-03
+│           └── 00000-10-2fbe786d-97f9-4626-be1a-0f048c3dced9-00012.parquet
+└── metadata
+    ├── 25c1a7e6-e83e-4337-8f95-515b6761dd43-m0.avro
+    ├── snap-9042763890032070143-1-25c1a7e6-e83e-4337-8f95-515b6761dd43.avro
+    ├── v1.metadata.json
+    ├── v2.metadata.json
+    └── version-hint.text
+```
+
+```
+元数据文件 (Metadata File, v*.metadata.json)
+     └── 快照 (Snapshot)
+          └── 清单列表 (Manifest List, snap-*.avro)
+                └── 清单文件 (Manifest File, *.avro)  ← ManifestFile 类
+                     └── 数据文件 (Data File, *.parquet/orc/avro)
+```
+
+
+## 1.1 Schema
+
+Iceberg的metadata中， 有一段是用来描述表的schema信息，如下示例：
+
+```json
+"schemas" : [ {
+  "type" : "struct",
+  "schema-id" : 0,
+  "fields" : [ {
+    "id" : 1,
+    "name" : "id",
+    "required" : false,
+    "type" : "int"
+  }, {
+    "id" : 2,
+    "name" : "data",
+    "required" : false,
+    "type" : "string"
+  } ]
+} ]
+```
+
+Schema 类就是表schema信息的java描述。其中描述了schema中有多少`column`，`column id`，`column name`，`column type`等信息。
+
 * Schema Map
 * UpdateSchema
 
 
-# PartitionSpec
+## 1.2 PartitionSpec
 
-# SnapShot
+Iceberg中用来描述表的 partition 定义的类。用来表示如何 produce 一个表的分区数据。
+通常包含表分区的 `spec-id`， `partitionField`列表（即哪写 column 为一个分区列)等信息。
+如下示例表示这个表是一个`非分区表`。
+
+```json
+"default-spec-id" : 0,
+"partition-specs" : [ {
+  "spec-id" : 0,
+  "fields" : [ ]
+} ],
+"last-partition-id" : 999
+```
+
+以下是一个分区表示例：
+
+```json
+"default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ {
+      "name" : "country",
+      "transform" : "identity",
+      "source-id" : 5,
+      "field-id" : 1000
+    }, {
+      "name" : "grass_date",
+      "transform" : "identity",
+      "source-id" : 4,
+      "field-id" : 1001
+    } ]
+  } ],
+  "last-partition-id" : 1001,
+```
+
+## 1.3 SortOrder
+
+SortOrder 是用来描述 Table 中的数据和被删除的文件该如何排序的类。
+它包含用来做排序的 field 列表。
+
+```json
+"default-sort-order-id" : 0,
+"sort-orders" : [ {
+  "order-id" : 0,
+  "fields" : [ ]
+} ],
+```
+
+## 1.4 Properties
+
+表的属性，通常是一批KV对。在Table Metadata 中用 `Map<String, String>` 来表示.
+
+```json
+"properties" : {
+  "owner" : "li.luo",
+  "write.parquet.compression-codec" : "zstd"
+},
+```
+
+## 1.5 Snapshot
+
+Snapshot 表示 Table 在某个时间点的数据快照。通常一个 snapshot 包含一个或者多个 manifest 文件，Table 在这个 snapshot 中的完整数据是所有这些 manifest file指向的数据文件的集合。
+snapshot 由 Table 的一次 `操作（Operation）` 创建，比如 `AppendFiles` 或 `ReWriteFiles`
+
+一个 Snapshot 包含如下fields：
+* `sequenceNumber` : 每个snapshot都会由一个 sequenceNumber，表示这是 Table 的第几个快照。
+* `snapshotId` ：每个snapshot都有一个唯一的ID
+* `parentId` : 当前快照的 parent 快照ID
+* `timestampMillis` : 当前快照的创建时间
+* `manifestListLocation` ：当前快照的 manifest list文件路径。注意，这里是manifest list文件的路径，不是 manifest 文件（通常由一个或多个）本身路径
+* `operation` ：创建当前snapshot 的 DataOperation 操作。 
+  * `append` : 向表中插入新的数据，没有数据删除。由 `AppendFiles` 类实现
+  * `replace` ：表中文件被删除并被替换成其他文件，没有对表中数据进行修改。由 `ReWriteFiles` 类实现
+  * `overwrite` ： 表中文件的数据被重写并被替换。由 `OverWriteFiels` 和 `ReplacePartition` 类实现
+  * `delete` : 数据被从表中删除， 没有数据新增。 由 `DeleteFiles` 类实现
+* `schemaId` : 当前快照所使用的schema的id
+* `firstRowId` ：当前快照中第一条被写入的数据的 row id。每一条被写入当前快照的数据都会被赋予一条大于改 firstRowId 的ID，所有小于该 firstRowId 的数据都是在当前快照之前的快照中。
+* `addedRows` ： 当前快照中写入了多少条新记录。
+* `allManifests` : `List<ManifestFile>`，当前快照的所有 manifest files
+* `dataManifests` : `List<ManifestFile>`，当前快照的所有 data的 manifest files（parquet file）
+* `deleteManifests` : `List<ManifestFile>`，当前快照的所有 数据删除的manifest files
+* `addedDataFiles` : `List<ManifestFile>`，当前快照的所有 新写入数据的 manifest files
+* `removedDataFiles` : `List<ManifestFile>`，当前快照的所有 删除数据文件的 manifest files
+* `addedDeleteFiles` : `List<ManifestFile>`，当前快照的新增删除数据的manifest files
+* `removedDeleteFiles` : `List<ManifestFile>`，当前快照的所有删除 数据清理的 manifest files
+
+snapshot在metadata文件中的数据示例如下：
+
+```json
+"current-snapshot-id" : 5412422061727073641,
+  "refs" : {
+    "main" : {
+      "snapshot-id" : 5412422061727073641,
+      "type" : "branch"
+    }
+  },
+  "snapshots" : [ {
+    "sequence-number" : 1,
+    "snapshot-id" : 973334179108984755,
+    "timestamp-ms" : 1745306934471,
+    "summary" : {
+      "operation" : "append",
+      "spark.app.id" : "local-1745306923882",
+      "added-data-files" : "2",
+      "added-records" : "2",
+      "added-files-size" : "1194",
+      "changed-partition-count" : "1",
+      "total-records" : "2",
+      "total-files-size" : "1194",
+      "total-data-files" : "2",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "/tmp/iceberg/warehouse/db/test/metadata/snap-973334179108984755-1-2ac48652-90e9-4219-9234-27cf38cae740.avro",
+    "schema-id" : 0
+  }, {
+    "sequence-number" : 2,
+    "snapshot-id" : 6705611632697455614,
+    "parent-snapshot-id" : 973334179108984755,
+    "timestamp-ms" : 1745307602890,
+    "summary" : {
+      "operation" : "append",
+      "spark.app.id" : "local-1745307592604",
+      "added-data-files" : "2",
+      "added-records" : "2",
+      "added-files-size" : "1194",
+      "changed-partition-count" : "1",
+      "total-records" : "4",
+      "total-files-size" : "2388",
+      "total-data-files" : "4",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "/tmp/iceberg/warehouse/db/test/metadata/snap-6705611632697455614-1-8f699dbf-1d9f-4686-b9fc-7ff1514e9dc6.avro",
+    "schema-id" : 0
+  } ],
+```
+
+### 1.5.1 snapshot avro文件 （Manifest List文件）示例
+
+格式定义：
+```json
+{
+  "type" : "record",
+  "name" : "manifest_entry",
+  "fields" : [ {
+    "name" : "status",
+    "type" : "int",
+    "field-id" : 0
+  }, {
+    "name" : "snapshot_id",
+    "type" : [ "null", "long" ],
+    "default" : null,
+    "field-id" : 1
+  }, {
+    "name" : "sequence_number",
+    "type" : [ "null", "long" ],
+    "default" : null,
+    "field-id" : 3
+  }, {
+    "name" : "file_sequence_number",
+    "type" : [ "null", "long" ],
+    "default" : null,
+    "field-id" : 4
+  }, {
+    "name" : "data_file",
+    "type" : {
+      "type" : "record",
+      "name" : "r2",
+      "fields" : [ {
+        "name" : "content",
+        "type" : "int",
+        "doc" : "Contents of the file: 0=data, 1=position deletes, 2=equality deletes",
+        "field-id" : 134
+      }, {
+        "name" : "file_path",
+        "type" : "string",
+        "doc" : "Location URI with FS scheme",
+        "field-id" : 100
+      }, {
+        "name" : "file_format",
+        "type" : "string",
+        "doc" : "File format name: avro, orc, or parquet",
+        "field-id" : 101
+      }, {
+        "name" : "partition",
+        "type" : {
+          "type" : "record",
+          "name" : "r102",
+          "fields" : [ {
+            "name" : "country",
+            "type" : [ "null", "string" ],
+            "default" : null,
+            "field-id" : 1000
+          }, {
+            "name" : "grass_date",
+            "type" : [ "null", {
+              "type" : "int",
+              "logicalType" : "date"
+            } ],
+            "default" : null,
+            "field-id" : 1001
+          } ]
+        },
+        "doc" : "Partition data tuple, schema based on the partition spec",
+        "field-id" : 102
+      }, {
+        "name" : "record_count",
+        "type" : "long",
+        "doc" : "Number of records in the file",
+        "field-id" : 103
+      }, {
+        "name" : "file_size_in_bytes",
+        "type" : "long",
+        "doc" : "Total file size in bytes",
+        "field-id" : 104
+      }, {
+        "name" : "column_sizes",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : {
+            "type" : "record",
+            "name" : "k117_v118",
+            "fields" : [ {
+              "name" : "key",
+              "type" : "int",
+              "field-id" : 117
+            }, {
+              "name" : "value",
+              "type" : "long",
+              "field-id" : 118
+            } ]
+          },
+          "logicalType" : "map"
+        } ],
+        "doc" : "Map of column id to total size on disk",
+        "default" : null,
+        "field-id" : 108
+      }, {
+        "name" : "value_counts",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : {
+            "type" : "record",
+            "name" : "k119_v120",
+            "fields" : [ {
+              "name" : "key",
+              "type" : "int",
+              "field-id" : 119
+            }, {
+              "name" : "value",
+              "type" : "long",
+              "field-id" : 120
+            } ]
+          },
+          "logicalType" : "map"
+        } ],
+        "doc" : "Map of column id to total count, including null and NaN",
+        "default" : null,
+        "field-id" : 109
+      }, {
+        "name" : "null_value_counts",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : {
+            "type" : "record",
+            "name" : "k121_v122",
+            "fields" : [ {
+              "name" : "key",
+              "type" : "int",
+              "field-id" : 121
+            }, {
+              "name" : "value",
+              "type" : "long",
+              "field-id" : 122
+            } ]
+          },
+          "logicalType" : "map"
+        } ],
+        "doc" : "Map of column id to null value count",
+        "default" : null,
+        "field-id" : 110
+      }, {
+        "name" : "nan_value_counts",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : {
+            "type" : "record",
+            "name" : "k138_v139",
+            "fields" : [ {
+              "name" : "key",
+              "type" : "int",
+              "field-id" : 138
+            }, {
+              "name" : "value",
+              "type" : "long",
+              "field-id" : 139
+            } ]
+          },
+          "logicalType" : "map"
+        } ],
+        "doc" : "Map of column id to number of NaN values in the column",
+        "default" : null,
+        "field-id" : 137
+      }, {
+        "name" : "lower_bounds",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : {
+            "type" : "record",
+            "name" : "k126_v127",
+            "fields" : [ {
+              "name" : "key",
+              "type" : "int",
+              "field-id" : 126
+            }, {
+              "name" : "value",
+              "type" : "bytes",
+              "field-id" : 127
+            } ]
+          },
+          "logicalType" : "map"
+        } ],
+        "doc" : "Map of column id to lower bound",
+        "default" : null,
+        "field-id" : 125
+      }, {
+        "name" : "upper_bounds",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : {
+            "type" : "record",
+            "name" : "k129_v130",
+            "fields" : [ {
+              "name" : "key",
+              "type" : "int",
+              "field-id" : 129
+            }, {
+              "name" : "value",
+              "type" : "bytes",
+              "field-id" : 130
+            } ]
+          },
+          "logicalType" : "map"
+        } ],
+        "doc" : "Map of column id to upper bound",
+        "default" : null,
+        "field-id" : 128
+      }, {
+        "name" : "key_metadata",
+        "type" : [ "null", "bytes" ],
+        "doc" : "Encryption key metadata blob",
+        "default" : null,
+        "field-id" : 131
+      }, {
+        "name" : "split_offsets",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : "long",
+          "element-id" : 133
+        } ],
+        "doc" : "Splittable offsets",
+        "default" : null,
+        "field-id" : 132
+      }, {
+        "name" : "equality_ids",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : "int",
+          "element-id" : 136
+        } ],
+        "doc" : "Equality comparison field IDs",
+        "default" : null,
+        "field-id" : 135
+      }, {
+        "name" : "sort_order_id",
+        "type" : [ "null", "int" ],
+        "doc" : "Sort order ID",
+        "default" : null,
+        "field-id" : 140
+      } ]
+    },
+    "field-id" : 2
+  } ]
+}
+```
+
+内容：
+
+```json
+{
+   "manifest_path":"/tmp/iceberg/warehouse/db/orders/metadata/25c1a7e6-e83e-4337-8f95-515b6761dd43-m0.avro",
+   "manifest_length":8456,
+   "partition_spec_id":0,
+   "content":0,
+   "sequence_number":1,
+   "min_sequence_number":1,
+   "added_snapshot_id":9042763890032070143,
+   "added_data_files_count":12,
+   "existing_data_files_count":0,
+   "deleted_data_files_count":0,
+   "added_rows_count":100,
+   "existing_rows_count":0,
+   "deleted_rows_count":0,
+   "partitions":[
+      {
+         "contains_null":false,
+         "contains_nan":false,
+         "lower_bound":"Brazil",
+         "upper_bound":"USA"
+      },
+      {
+         "contains_null":false,
+         "contains_nan":false,
+         "lower_bound":"\u009EK\u0000\u0000",
+         "upper_bound":"K\u0000\u0000"
+      }
+   ]
+}
+```
+
+### 1.5.1 ManifestFile
+
+ManifestFile 表示一个 manifest 清单文件，清单文件记录一组 **数据文件（Data Files）** 的元信息，数据文件是实际存储表数据的文件（如 Parquet 文件）。
+
+清单文件以 Avro 格式存储，包含多个条目（entry），每个条目描述一个数据文件的元信息。以下是一个清单文件的伪 JSON 表示（实际为 Avro）：
+
+```json
+[
+  {
+    "status": 1,  // 1=新增, 2=现有, 0=删除
+    "snapshot_id": 1234567890,
+    "data_file": {
+      "content": 0,  // 0=数据文件, 1=删除文件
+      "file_path": "/tmp/iceberg/warehouse/db/table/data/sale_date=2023-01-01/00000-0-abc123.parquet",
+      "file_format": "PARQUET",
+      "partition": {"sale_date": "2023-01-01"},
+      "record_count": 100,
+      "file_size_in_bytes": 1024000,
+      "column_sizes": {"1": 4000, "2": 8000},
+      "value_counts": {"1": 100, "2": 100},
+      "null_value_counts": {"1": 0, "2": 0},
+      "lower_bounds": {"1": 1, "2": 10.0},
+      "upper_bounds": {"1": 100, "2": 1000.0}
+    }
+  },
+  {
+    "status": 1,
+    "snapshot_id": 1234567890,
+    "data_file": {
+      "file_path": "/tmp/iceberg/warehouse/db/table/data/sale_date=2023-01-01/00000-1-def456.parquet",
+      "partition": {"sale_date": "2023-01-01"},
+      "record_count": 50,
+      ...
+    }
+  }
+]
+```
+
+* status：数据文件的状态：
+  * 1：新增（added）。
+  * 2：现有（existing）。
+  * 0：删除（deleted）。
+* snapshot_id：数据文件所属的快照 ID。
+* data_file：数据文件的详细元信息，包括路径、格式、分区值、记录数和列统计信息（如 `lower_bounds` 和 `upper_bounds`）。
+
+
+
+
+
 * HistoryEntry
   * An entry contains a change to the table state. At the given timestamp, the current snapshot was set to the given snapshot ID.
 * UpdateLocation
@@ -138,4 +743,3 @@
   * Interface for providing data file locations to write tasks.
     Implementations must be Serializable because instances will be serialized to tasks.
 
-# SortOrder
