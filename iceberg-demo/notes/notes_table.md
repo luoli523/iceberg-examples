@@ -380,7 +380,7 @@ snapshot在metadata文件中的数据示例如下：
 }
 ```
 
-### 1.5.1 ManifestFile
+### 1.5.2 ManifestFile
 
 ManifestFile 表示一个 manifest 清单文件，清单文件记录一组 **数据文件（Data Files）** 的元信息，数据文件是实际存储表数据的文件（如 Parquet 文件）。
 
