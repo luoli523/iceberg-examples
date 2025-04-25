@@ -353,7 +353,7 @@ snapshot在metadata文件中的数据示例如下：
    "manifest_path":"/tmp/iceberg/warehouse/db/orders/metadata/25c1a7e6-e83e-4337-8f95-515b6761dd43-m0.avro",
    "manifest_length":8456,
    "partition_spec_id":0,
-   "content":0,
+   "content":0,  // 0=数据文件, 1=删除文件 对应 ManifestContent 类
    "sequence_number":1,
    "min_sequence_number":1,
    "added_snapshot_id":9042763890032070143,
@@ -426,8 +426,9 @@ ManifestFile 表示一个 manifest 清单文件，清单文件记录一组 **数
 * data_file：数据文件的详细元信息，包括路径、格式、分区值、记录数和列统计信息（如 `lower_bounds` 和 `upper_bounds`）。
 
 
+## 1.6 MetadataUpdate
 
-
+表示对 Table或 View 的 Metadata的一次变更。 不同的变更类型包括：
 
 * HistoryEntry
   * An entry contains a change to the table state. At the given timestamp, the current snapshot was set to the given snapshot ID.
