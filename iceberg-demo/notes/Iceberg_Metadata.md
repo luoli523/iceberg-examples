@@ -77,6 +77,126 @@
 5. Properties ： Table 的属性KV对
 6. Snapshot List : Table 的所有 snapshot 的描述详情和变更历史
 
+一个 Table Metadata json file示例 (v3.metadata.json)：
+
+```json
+{
+  "format-version" : 2,
+  "table-uuid" : "43231447-a29c-47f6-8172-a54f332ecb2e",
+  "location" : "/tmp/iceberg/warehouse/db/sales",
+  "last-sequence-number" : 2,
+  "last-updated-ms" : 1745552903559,
+  "last-column-id" : 3,
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "id",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 2,
+      "name" : "amount",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 3,
+      "name" : "sale_date",
+      "required" : false,
+      "type" : "date"
+    } ]
+  } ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ {
+      "name" : "sale_date",
+      "transform" : "identity",
+      "source-id" : 3,
+      "field-id" : 1000
+    } ]
+  } ],
+  "last-partition-id" : 1000,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "owner" : "li.luo",
+    "write.parquet.compression-codec" : "zstd"
+  },
+  "current-snapshot-id" : 6206490217468364957,
+  "refs" : {
+    "main" : {
+      "snapshot-id" : 6206490217468364957,
+      "type" : "branch"
+    }
+  },
+  "snapshots" : [ {
+    "sequence-number" : 1,
+    "snapshot-id" : 5007280460602055120,
+    "timestamp-ms" : 1745552899694,
+    "summary" : {
+      "operation" : "append",
+      "spark.app.id" : "local-1745552887467",
+      "added-data-files" : "1",
+      "added-records" : "2",
+      "added-files-size" : "941",
+      "changed-partition-count" : "1",
+      "total-records" : "2",
+      "total-files-size" : "941",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "/tmp/iceberg/warehouse/db/sales/metadata/snap-5007280460602055120-1-51ae4cf8-9fa3-424a-a699-44056e1d98b4.avro",
+    "schema-id" : 0
+  }, {
+    "sequence-number" : 2,
+    "snapshot-id" : 6206490217468364957,
+    "parent-snapshot-id" : 5007280460602055120,
+    "timestamp-ms" : 1745552903559,
+    "summary" : {
+      "operation" : "overwrite",
+      "spark.app.id" : "local-1745552887467",
+      "added-data-files" : "1",
+      "deleted-data-files" : "1",
+      "added-records" : "1",
+      "deleted-records" : "2",
+      "added-files-size" : "904",
+      "removed-files-size" : "941",
+      "changed-partition-count" : "1",
+      "total-records" : "1",
+      "total-files-size" : "904",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "/tmp/iceberg/warehouse/db/sales/metadata/snap-6206490217468364957-1-8e9d49ab-d9de-42e8-927b-9603fb4e390a.avro",
+    "schema-id" : 0
+  } ],
+  "statistics" : [ ],
+  "snapshot-log" : [ {
+    "timestamp-ms" : 1745552899694,
+    "snapshot-id" : 5007280460602055120
+  }, {
+    "timestamp-ms" : 1745552903559,
+    "snapshot-id" : 6206490217468364957
+  } ],
+  "metadata-log" : [ {
+    "timestamp-ms" : 1745552892695,
+    "metadata-file" : "/tmp/iceberg/warehouse/db/sales/metadata/v1.metadata.json"
+  }, {
+    "timestamp-ms" : 1745552899694,
+    "metadata-file" : "/tmp/iceberg/warehouse/db/sales/metadata/v2.metadata.json"
+  } ]
+}
+```
 
 
 一个Iceberg `非分区表` 表目录结构示例：
@@ -428,7 +548,15 @@ ManifestFile 表示一个 manifest 清单文件，清单文件记录一组 **数
 
 ## 1.6 MetadataUpdate
 
-表示对 Table或 View 的 Metadata的一次变更。 不同的变更类型包括：
+表示对 Table或 View 的 Metadata (如v1.metadata.json)的一次变更。 不同的变更类型包括：
+
+## 1.7 PendingUpdate
+
+表示对 Table metadata的一次操作API 描述。其中的调用接口：
+
+* commit() —— 一旦调用，就表示这次对 metadata 的修改正式commit了。一旦commit成功，则表示table已经被更新。
+
+PendingUpdata有很多的子类，分别表示对 Table metadata 的各种不同操作。
 
 * HistoryEntry
   * An entry contains a change to the table state. At the given timestamp, the current snapshot was set to the given snapshot ID.
