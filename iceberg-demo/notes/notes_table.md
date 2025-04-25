@@ -392,7 +392,7 @@ ManifestFile 表示一个 manifest 清单文件，清单文件记录一组 **数
     "status": 1,  // 1=新增, 2=现有, 0=删除
     "snapshot_id": 1234567890,
     "data_file": {
-      "content": 0,  // 0=数据文件, 1=删除文件
+      "content": 0,  // 0=数据文件, 1=删除文件 对应 ManifestContent 类
       "file_path": "/tmp/iceberg/warehouse/db/table/data/sale_date=2023-01-01/00000-0-abc123.parquet",
       "file_format": "PARQUET",
       "partition": {"sale_date": "2023-01-01"},
